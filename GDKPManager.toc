@@ -1,0 +1,27 @@
+## Interface: 30200
+## Title: GDKP Manager
+## Notes: Helps people manage GDKP raids
+## Author: Shadowed
+## OptionalDeps: Ace3, AceGUI-3.0-SharedMediaWidgets, LibSharedMedia-3.0
+## X-LoadOn-Events: PLAYER_ENTERING_WORLD, ZONE_CHANGED_NEW_AREA
+## X-LoadOn-ZONE_CHANGED_NEW_AREA: if( select(2, IsInInstance()) == "raid" ) then AddonLoader:LoadAddOn("GDKPManager") end
+## X-LoadOn-PLAYER_ENTERING_WORLD: if( select(2, IsInInstance()) == "raid" ) then AddonLoader:LoadAddOn("GDKPManager") end
+## X-LoadOn-Slash: /gdkp, /gdkpmanager, /gdkpmanage
+## SavedVariables: GDKPManagerDB
+
+libs\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+libs\AceAddon-3.0\AceAddon-3.0.xml
+libs\AceEvent-3.0\AceEvent-3.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\AceConfig-3.0\AceConfig-3.0.xml
+libs\ChatThrottleLib\ChatThrottleLib.xml
+
+localization.enUS.lua
+
+GDKPManager.lua
+auctionItems.lua
+paymentTracker.lua
+config.lua
