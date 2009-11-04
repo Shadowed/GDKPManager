@@ -259,6 +259,23 @@ function Auctions:UpdateRow(itemLink)
 	row:UpdateStatus(status.type == "auction" and "disable" or "enable")
 end
 
+function Auctions:BuildAttendanceList()
+	local raidMembers = GDKPManager.raidLogs[GDKPManager.db.profile.currentRaid].members
+	for i=1, GetNumPartyMembers() do
+		local unit = "party" .. i
+		if( UnitExists(unit) ) then
+			raidMembers[UnitName(unit)] = select(2, UnitClass(unit))
+		end
+	end
+
+	for i=1, GetNumRaidMembers() do
+		local unit = "raid" .. i
+		if( UnitExists(unit) ) then
+			raidMembers[UnitName(unit)] = select(2, UnitClass(unit))
+		end
+	end
+end
+
 function Auctions:LOOT_OPENED()
 	if( self.frame ) then
 		for _, row in pairs(self.frame.rows) do row:UpdateStatus("reset"); row:Hide() end
@@ -294,6 +311,10 @@ function Auctions:LOOT_OPENED()
 			end
 		end
 	end
+	
+	-- Attendance list is built when loot window is open to catch people who are "in" the raid
+	-- rather than those who are removed when it starts, not 100% but it's better than doing it on RRU/PMC
+	self:BuildAttendanceList()
 end
 
 function Auctions:LOOT_CLOSED()
@@ -418,6 +439,7 @@ function Auctions:FinishedAuction()
 		end
 	end
 	
+	self:BuildAttendanceList()
 	self:SendMessage("REBUILD_LOGS", GDKPManager.db.profile.currentRaid)
 	self:UnregisterEvent("CHAT_MSG_RAID")
 	self:UnregisterEvent("CHAT_MSG_RAID_LEADER")
