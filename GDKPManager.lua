@@ -46,14 +46,14 @@ end
 -- Only enable modules if a raid is running
 function GDKPManager:ZONE_CHANGED_NEW_AREA()
 	local type = select(2, IsInInstance())
-	if( instanceType == "raid" and type ~= instanceType and self.db.profile.currentRaid and not self.isActive ) then
+	if( type == "raid" and type ~= instanceType and self.db.profile.currentRaid and not self.isActive ) then
 		self.isActive = true
 		for _, module in pairs(self.modules) do
 			if( module.Enable ) then
 				module:Enable()
 			end
 		end
-	elseif( instanceType ~= "raid" and type == "raid" and self.db.profile.currentRaid and self.isActive ) then
+	elseif( type ~= "raid" and instanceType == "raid" and self.db.profile.currentRaid and self.isActive ) then
 		self.isActive = nil
 		for _, module in pairs(self.modules) do
 			if( module.Disable ) then
