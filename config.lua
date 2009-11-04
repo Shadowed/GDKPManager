@@ -624,7 +624,7 @@ SlashCmdList["GDKPMANAGER"] = function(msg)
 			self:GroupMessage(string.format(L["GDKP run %s is over!"], self.db.profile.currentRaid))
 			self:AnnouncePot(self.db.profile.currentRaid)
 		else
-			self:Print(string.format(L["Ended raid %s, you can find records of it in /gdkp options."]))
+			self:Print(string.format(L["Ended raid %s, you can find records of it in /gdkp options."], self.db.profile.currentRaid))
 			self:AnnouncePot(self.db.profile.currentRaid)
 		end
 		
