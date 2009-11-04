@@ -107,8 +107,8 @@ function GDKPManager:AnnouncePot(raid)
 	for itemID, loot in pairs(log.loot) do
 		if( loot.owed ) then
 			totalOwed = totalOwed + 1
-		elseif( loot.paid ) then
-			totalGold = totalGold + loot.paid
+		elseif( loot.price ) then
+			totalGold = totalGold + loot.price
 			totalSold = totalSold + 1
 		elseif( loot.unsold ) then
 			totalUnsold = totalUnsold + 1
