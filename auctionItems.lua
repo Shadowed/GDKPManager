@@ -9,7 +9,7 @@ function Auctions:Enable()
 end
 
 function Auctions:Disable()
-	selfl:UnregisterAllEvents()
+	self:UnregisterAllEvents()
 end
 
 local function setBossName(self)
@@ -261,7 +261,7 @@ end
 
 function Auctions:LOOT_OPENED()
 	if( self.frame ) then
-		for _, row in pairs(self.frame.rows) do row:UpdateStatus("reset") end
+		for _, row in pairs(self.frame.rows) do row:UpdateStatus("reset"); row:Hide() end
 		self.frame.usedRows = 0
 		self.frame:Hide()
 	end
@@ -290,6 +290,7 @@ function Auctions:LOOT_OPENED()
 			
 			if( not found ) then
 				table.insert(raidLoot, {boss = self.frame.bossName:GetText(), link = itemLink, time = GetTime()})
+				self:SendMessage("REBUILD_LOGS", GDKPManager.db.profile.currentRaid)
 			end
 		end
 	end
@@ -297,7 +298,7 @@ end
 
 function Auctions:LOOT_CLOSED()
 	if( self.frame ) then
-		if( self.frame:IsVisible() and self.db.profile.autoPot ) then
+		if( self.frame:IsVisible() and GDKPManager.db.profile.autoPot ) then
 			self:AnnouncePot(self.db.profile.currentRaid)
 		end
 		
@@ -333,9 +334,8 @@ end)
 function Auctions.StartAuction(button)
 	local itemLink = button:GetParent().itemLink
 	local fullItemLink = itemLink and select(2, GetItemInfo(itemLink))
+	local self = Auctions
 	if( not fullItemLink or ( GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 ) ) then return end
-	
-	self = Auctions
 
 	status.type = "auction"
 	status.highest = nil
@@ -369,7 +369,7 @@ function Auctions:CheckBidMessage(event, message, sender)
 	-- Try and sanitize it by removing any item, achievement, etc links
 	message = string.gsub(message, "|c(.-)|r", "")
 	message = string.trim(message)
-	bid = tonumber(string.match(message, "(%d+)"))
+	local bid = tonumber(string.match(message, "(%d+)"))
 	if( not bid or bid < status.nextBid ) then return end
 	
 	status.highest = sender
@@ -418,6 +418,7 @@ function Auctions:FinishedAuction()
 		end
 	end
 	
+	self:SendMessage("REBUILD_LOGS", GDKPManager.db.profile.currentRaid)
 	self:UnregisterEvent("CHAT_MSG_RAID")
 	self:UnregisterEvent("CHAT_MSG_RAID_LEADER")
 	self:UnregisterEvent("CHAT_MSG_PARTY")
