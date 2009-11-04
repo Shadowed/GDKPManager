@@ -289,8 +289,8 @@ function Auctions:LOOT_OPENED()
 	for i=1, GetNumLootItems() do
 		-- All of the new currency items seem to be using Money/Money(OBSOLETE) should be able to rely on this
 		local itemLink = GDKPManager:GetItemID(GetLootSlotLink(i))
-		local itemRarity, _, _, itemType, itemSubType, itemStack = select(3, GetItemInfo(itemLink))
-		if( itemRarity and itemRarity >= 4 and itemType ~= "Money" and itemSubType ~= "Money(OBSOLETE)" ) then
+		local itemRarity, _, _, itemType, itemSubType, itemStack = select(3, GetItemInfo(itemLink or ""))
+		if( itemLink and itemRarity and itemRarity >= 0 and itemType ~= "Money" and itemSubType ~= "Money(OBSOLETE)" ) then
 			self:UpdateFrame(bossName)
 			self:UpdateRow(itemLink)
 			
@@ -320,7 +320,7 @@ end
 function Auctions:LOOT_CLOSED()
 	if( self.frame ) then
 		if( self.frame:IsVisible() and GDKPManager.db.profile.autoPot ) then
-			self:AnnouncePot(self.db.profile.currentRaid)
+			GDKPManager:AnnouncePot(GDKPManager.db.profile.currentRaid)
 		end
 		
 		self.frame:Hide()
@@ -407,7 +407,7 @@ function Auctions:FinishedAuction()
 		if( row.itemLink == status.link ) then
 			row:UpdateStatus(status.highest and "sold" or "de")
 		else
-			row:UpdateStatus("enabe")
+			row:UpdateStatus("enable")
 		end
 	end
 
