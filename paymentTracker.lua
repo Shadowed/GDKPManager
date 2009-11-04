@@ -5,10 +5,10 @@ local lastSpammed, owedList = {}, {}
 local SPAM_TIMEOUT = 5 * 10
 
 function Payment:Enable()
+	self:RegisterEvent("UI_INFO_MESSAGE")
 	self:RegisterEvent("TRADE_MONEY_CHANGED")
-	self:RegisterEvent("TRADE_ACCEPT_UPDATE")
-	self:RegisterEvent("TRADE_CLOSED")
 	self:RegisterEvent("TRADE_SHOW")
+	self:UpdateFrame()
 end
 
 function Payment:Disable()
@@ -45,14 +45,11 @@ function Payment:TRADE_MONEY_CHANGED()
 	tradeName = UnitName("npc")
 end
 
-function Payment:TRADE_ACCEPT_UPDATE(event, player, target)
-	if( player == 1 and target == 1 ) then
-		tradeAccepted = true
-	end
-end
-
--- Clear however much debt we can
-function Payment:TRADE_CLOSED()
+-- Silly that this has to be registered, there's no (easy) way to find out that a trade went through
+-- besides simply watching for the event
+function Payment:UI_INFO_MESSAGE(event, msg)
+	if( msg ~= ERR_TRADE_COMPLETE ) then return end
+	
 	local raidLog = GDKPManager.db.profile.currentRaid and GDKPManager.raidLogs[GDKPManager.db.profile.currentRaid]
 	if( tradeAccepted and tradeGold and tradeName and raidLog and tradeIsOwed ) then
 		local goldPaid = math.floor(tradeGold / COPPER_PER_GOLD)
@@ -62,10 +59,12 @@ function Payment:TRADE_CLOSED()
 		-- then it will remove 350g from the 500g debt leaving them with owing 150g still
 		for i=#(raidLog.loot), 1, -1 do
 			local loot = raidLog.loot[i]
+			print(loot.owed, loot.winner, loot.winner == tradeName)
 			if( loot.owed and loot.winner == tradeName ) then
 				if( goldPaid >= loot.owed ) then
 					goldPaid = goldPaid - loot.owed
 					loot.owed = nil
+					print("paid all up!", loot.link)
 				else
 					loot.owed = loot.owed - goldPaid
 					break
@@ -91,6 +90,25 @@ local function sortAmounts(a, B)
 end
 
 function Payment:UpdateFrame()
+	local raidLog = GDKPManager.raidLogs[GDKPManager.db.profile.currentRaid]
+
+	-- Figure out who owes what in totals for the display
+	table.wipe(owedList)
+	local found
+	for _, loot in pairs(raidLog.loot) do
+		if( loot.owed ) then
+			found = true
+			owedList[loot.winner] = (owedList[loot.winner] or 0) + loot.owed
+		end
+	end
+	
+	if( not found ) then
+		if( self.frame ) then
+			self.frame:Hide()
+		end
+		return		
+	end
+
 	if( not self.frame ) then
 		self.frame = CreateFrame("Frame", nil, UIParent)
 		self.frame:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -149,16 +167,6 @@ function Payment:UpdateFrame()
 	end
 	
 	for _, row in pairs(self.frame.rows) do row:Hide() end
-	
-	local raidLog = GDKPManager.raidLogs[GDKPManager.db.profile.currentRaid]
-
-	-- Figure out who owes what in totals for the display
-	table.wipe(owedList)
-	for _, loot in pairs(raidLog.loot) do
-		if( loot.owed ) then
-			owedList[loot.winner] = (owedList[loot.winner] or 0) + loot.owed
-		end
-	end
 	
 	-- Now do a display update
 	local used = 0
