@@ -633,8 +633,8 @@ SlashCmdList["GDKPMANAGER"] = function(msg)
 		if( select(2, IsInInstance()) == "raid" and self.isActive ) then
 			self.isActive = nil
 			for _, module in pairs(self.modules) do
-				if( module.Enable ) then
-					module:Enable()
+				if( module.Disable ) then
+					module:Disable()
 				end
 			end
 		end
