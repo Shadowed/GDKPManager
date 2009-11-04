@@ -73,7 +73,7 @@ function Payment:TRADE_CLOSED()
 			end
 		end
 		
-		
+		self:SendMessage("REBUILD_LOGS", GDKPManager.db.profile.currentRaid)
 		self:UpdateFrame()
 	end
 
@@ -217,18 +217,3 @@ function Payment:UpdateFrame()
 		self.frame:Hide()
 	end
 end
-
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:SetScript("OnEvent", function(self)
-	self:UnregisterAllEvents()
-	
-	--[[
-	GDKPManager.db.profile.currentRaid = "test"
-	GDKPManager.raidLogs["test"] = {startTime = time(), members = {}, loot = {}}
-	table.insert(GDKPManager.raidLogs["test"].loot, {link = "item:45141", time = GetTime(), auctioned = true, winner = "Xoee", price = 2, owed = 2})
-	table.insert(GDKPManager.raidLogs["test"].loot, {link = "item:42044", time = GetTime(), auctioned = true, winner = "Xoee", price = 1, owed = 1})
-	Payment:UpdateFrame()
-	Payment:Enable()
-	]]
-end)
