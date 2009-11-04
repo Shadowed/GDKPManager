@@ -88,12 +88,55 @@ local function loadGeneral()
 end
 
 local tempList, exportOptions = {}, {members = true, pot = true, loot = true, exported = {}}
+local buildAttendanceList, buildLootList
+local classList = CopyTable(LOCALIZED_CLASS_NAMES_FEMALE)
+
 local function setExportOption(info, value)
 	exportOptions[info[#(info)]] = value
 end
 
 local function getExportOption(info)
 	return exportOptions[info[#(info)]]
+end
+
+local function deleteLootRecord(info)
+	local raidLog = GDKPManager.raidLogs[idToRaid[info[2]]]
+	table.remove(raidLog.loot, info.arg)
+	buildLootList(info[2])
+end
+
+local function deleteAttendanceRecord(info)
+	local raidLog = GDKPManager.raidLogs[idToRaid[info[2]]]
+	local attendanceList = options.args.logs.args[info[2]].args.attendance.args.attendees.args
+	raidLog.members[info.arg] = nil
+	
+	attendanceList[info[2]] = nil
+	attendanceList[info[2] .. "des"] = nil
+	attendanceList[info[2] .. "sep"] = nil
+	
+	AceRegistry:NotifyChange("GDKPManager")
+end
+
+local attendeeName, attendeeLog
+local function setAttendeeName(info, value)
+	attendeeName = value
+	attendeeLog = info[2]
+end
+
+local function getAttendeeName(info)
+	return attendeeLog == info[2] and attendeeName or ""
+end
+
+local function setAttendeeClass(info, value)
+	local raidLog = GDKPManager.raidLogs[idToRaid[info[2]]]
+	raidLog.members[attendeeName] = value
+	attendeeName, attendeeLog = nil, nil
+
+	buildAttendanceList(info[2])
+end
+
+local function disableClassSelection(info)
+	return attendeeLog ~= info[2] or not attendeeName
 end
 
 local function getExportLog(info)
@@ -124,54 +167,160 @@ local function generateLog(info)
 		
 		table.sort(classList, sortClasses)
 		
-		for _, class in pairs(classlist) do
-			exported = string.format("%s[b]%s[/b]: %s", exported, class, table.conct(classAttendance[class], ", "))
+		for _, class in pairs(classList) do
+			exported = string.format("%s[b]%s (%d)[/b]: %s\n", exported, LOCALIZED_CLASS_NAMES_FEMALE[class], #(classAttendance[class]), table.concat(classAttendance[class], ", "))
 		end
 	end
 	
-									local totalOwed, totalSold, totalUnsold, totalGold, totalBuyers, totalDropped = 0, 0, 0, 0, 0, 0
-									for itemID, loot in pairs(raidLog.loot) do
-										if( loot.owed ) then
-											totalOwed = totalOwed + loot.owed
-										elseif( loot.paid ) then
-											totalGold = totalGold + loot.paid
-											totalSold = totalSold + 1
-										elseif( loot.unsold ) then
-											totalUnsold = totalUnsold + 1
-										end
-										
-										totalDropped = totalDropped + 1
-										if( loot.winner and not tempList[loot.winner] ) then
-											tempList[loot.winner] = true
-											totalBuyers = totalBuyers + 1
-										end
-									end
-									
-									local totalAttended = 0
-									for name in pairs(raidLog.members) do totalAttended = totalAttended + 1 end
-									
-									local endTime = raidLog.endTime or time()	
-									local averagePrice = totalSold > 0 and totalGold / totalSold or 0
-									local averagePerPerson = totalAttended > 0 and totalGold / totalAttended or 0
-									local stat = string.format(L["Attended by |cff20ff20%d|r people, |cff20ff20%d|r buyers, %s %s."], totalAttended, totalBuyers, raidLog.endTime and L["log period"] or L["log still recording for"], string.lower(SecondsToTime(endTime - raidLog.startTime, nil, true)))
-									
-									stat = stat .. "\n" .. string.format(L["|cffffd700%d|r gold made, |cffffd700%d|r gold per person, buyers spent |cffffd700%d|r gold on average."], totalGold, averagePerPerson, totalGold / totalBuyers)
-									stat = stat .. "\n\n" .. string.format(L["|cff20ff20%d|r items dropped (|cffff2020%d|r unsold), average sale price |cffffd700%d|r gold."], totalDropped, totalUnsold, averagePrice, averagePrice)
-									
-									if( totalOwed > 0 ) then
-										stat = stat .. "\n\n" .. string.format(L["Still owed |cffff2020%d|r gold for items."], totalOwed)
-									end
-									
-
 	if( exportOptions.pot ) then
-				
+		if( exported ~= "" ) then exported = exported .. "\n" end
+		table.wipe(tempList)
+		
+		local totalSold, totalUnsold, totalGold, totalBuyers, totalDropped = 0, 0, 0, 0, 0
+		for _, loot in pairs(raidLog.loot) do
+			if( loot.price ) then
+				totalGold = totalGold + loot.price
+				totalSold = totalSold + 1
+			elseif( loot.unsold ) then
+				totalUnsold = totalUnsold + 1
+			end
+						
+			totalDropped = totalDropped + 1
+			if( loot.winner and not tempList[loot.winner] ) then
+				tempList[loot.winner] = true
+				totalBuyers = totalBuyers + 1
+			end
+		end
+		
+		local totalAttended = 0
+		for name in pairs(raidLog.members) do totalAttended = totalAttended + 1 end
+		local averagePrice = totalSold > 0 and totalGold / totalSold or 0
+		local averagePerPerson = totalAttended > 0 and totalGold / totalAttended or 0
+		
+		-- I feel dirty doing a concat and a string format at once :<
+		exported = exported .. string.format(L["[b]%s[/b] players attended ([b]%s[/b] buyers), [b]%d[/b] gold per person."], totalAttended, totalBuyers, averagePerPerson)
+		exported = exported .. "\n" .. string.format(L["[b]%d[/b] items dropped ([b]%d[/b] unsold), [b]%d[/b] gold per item average."], totalDropped, totalUnsold, averagePrice)
+	end
+	
+	if( exportOptions.loot ) then
+		if( exported ~= "" ) then exported = exported .. "\n" end
+		
+		local itemList = {}
+		for _, loot in pairs(raidLog.loot) do
+			local itemID = loot.link
+			itemList[itemID] = itemList[itemID] or {averagePrice = 0, winners = 0, unsold = 0}
+			
+			if( loot.winner ) then
+				itemList[itemID].averagePrice = itemList[itemID].averagePrice + loot.price
+				itemList[itemID].winners = itemList[itemID].winners + 1
+				table.insert(itemList[itemID], string.format(L["%d gold (%s)"], loot.price, loot.winner))
+			else
+				itemList[itemID].unsold = itemList[itemID].unsold + 1
+			end
+		end
+		
+		for itemID, drop in pairs(itemList) do
+			local itemName = GetItemInfo(itemID) or itemID
+			exported = exported .. "\n[" .. itemName .. "] "
+			
+			if( drop.unsold > 0 ) then
+				exported = exported .. string.format(L["%d were unsold"], drop.unsold)
+				if( drop.winners > 0 ) then exported = exported .. ", " end
+			end
+			
+			if( drop.winners > 0 ) then
+				exported = exported .. string.format(L["%d gold averaged: "], drop.averagePrice / drop.winners)
+				exported = exported .. table.concat(drop, ", ")
+			end
+		end
 	end
 		
 	if( not exportOptions.bbcode ) then
-		exported = string.gsub(string.gsub(exported, "%[/b%]", ""), "%[b%b]", "")
+		exported = string.gsub(string.gsub(exported, "%[/b%]", ""), "%[b%]", "")
 	end
 	
 	exportOptions.exported[idToRaid[info[2]]] = exported
+	AceRegistry:NotifyChange("GDKPManager")
+end
+
+buildLootList = function(logID)
+	local raidLog = GDKPManager.raidLogs[idToRaid[logID]]
+	local lootList = options.args.logs.args[logID].args.loot.args.list.args
+	
+	table.wipe(lootList)
+	
+	for id, loot in pairs(raidLog.loot) do
+		lootList[id .. "name"] = {
+			order = id,
+			type = "description",
+			name = select(2, GetItemInfo(loot.link)) or loot.link,
+			width = "",
+		}
+		
+		local status
+		if( loot.winner ) then
+			local class = raidLog.members[loot.winner]
+			local playerName = type(class) == "string" and string.format("|cff%02x%02x%02x%s|r", RAID_CLASS_COLORS[class].r * 255, RAID_CLASS_COLORS[class].g * 255, RAID_CLASS_COLORS[class].b * 255, loot.winner) or loot.winner
+
+			if( loot.owed ) then
+				status = string.format(L["%s (%s|cffffd700g|r |cffff2020owed|r)"], playerName, loot.price)
+			else
+				status = string.format("%s (%s|cffffd700g|r)", playerName, loot.price)
+			end
+		else
+			status = L["Unsold"]
+		end
+		
+		lootList[id .. "status"] = {
+			order = id + 0.50,
+			type = "description",
+			name = status,
+			width = "",	
+		}
+		
+		lootList[tostring(id)] = {
+			order = id + 0.75,
+			type = "description",
+			name = "",
+			width = "full",	
+		}
+	end
+end
+
+buildAttendanceList = function(logID)
+	local raidLog = GDKPManager.raidLogs[idToRaid[logID]]
+	local attendanceList = options.args.logs.args[logID].args.attendance.args.attendees.args
+	
+	table.wipe(attendanceList)
+	
+	local id = 0
+	for name, class in pairs(raidLog.members) do
+		id = id + 1
+		
+		attendanceList[id .. "des"] = {
+			order = id,
+			type = "description",
+			fontSize = "medium",
+			name = type(class) == "string" and string.format("|cff%02x%02x%02x%s|r", RAID_CLASS_COLORS[class].r * 255, RAID_CLASS_COLORS[class].g * 255, RAID_CLASS_COLORS[class].b * 255, name) or name,
+			width = "",
+		}
+		
+		attendanceList[tostring(id)] = {
+			order = id + 0.5,
+			type = "execute",
+			name = L["Delete"],
+			func = deleteAttendanceRecord,
+			arg = name,
+			width = "half",
+		}
+		
+		attendanceList[id .. "sep"] = {
+			order = id + 0.75,
+			type = "description",
+			name = "",
+			width = "full",
+		}
+	end
 end
 
 local function buildRaidLog(name)
@@ -207,8 +356,8 @@ local function buildRaidLog(name)
 									for itemID, loot in pairs(raidLog.loot) do
 										if( loot.owed ) then
 											totalOwed = totalOwed + loot.owed
-										elseif( loot.paid ) then
-											totalGold = totalGold + loot.paid
+										elseif( loot.price ) then
+											totalGold = totalGold + loot.price
 											totalSold = totalSold + 1
 										elseif( loot.unsold ) then
 											totalUnsold = totalUnsold + 1
@@ -290,7 +439,7 @@ local function buildRaidLog(name)
 								order = 6,
 								type = "execute",
 								name = L["Generate!"],		
-								set = generateLog,
+								func = generateLog,
 							},
 							export = {
 								order = 7,
@@ -305,8 +454,78 @@ local function buildRaidLog(name)
 					},
 				},	
 			},
+			loot = {
+				order = 2,
+				type = "group",
+				name = L["Loot"],
+				args = {
+					--[[
+					add = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Add drop"],
+						args = {
+							link = {
+								order = 1,	
+							},	
+						},	
+					},
+					]]
+					list = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Drop list"],
+						args = {
+						},
+					},
+				},	
+			},
+			attendance = {
+				order = 3,
+				type = "group",
+				name = L["Attendance"],	
+				args = {
+					add = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Add attendee"],
+						args = {
+							name = {
+								order = 1,
+								type = "input",
+								name = L["Player name"],
+								set = setAttendeeName,
+								get = getAttendeeName,
+							},
+							class = {
+								order = 2,
+								type = "select",
+								name = L["Player class"],
+								values = classList,
+								set = setAttendeeClass,
+								disabled = disableClassSelection	
+							},
+						},	
+					},
+					attendees = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["List of players who attended"],
+						args = {
+							
+						},	
+					},
+				},
+			},
 		},		
 	}
+	
+	buildAttendanceList(logID)
+	buildLootList(logID)
 end
 
 local function rebuildRaidLogs()
@@ -349,7 +568,10 @@ end
 
 -- Queues it so next time it'll reload it, need to figure out how to detect if the configuration is opened or closed next.
 function Config:REBUILD_LOGS(event, name)
-	rebuildQueue[name] = true
+	if( not rebuildQueue[name] ) then
+		rebuildQueue[name] = true
+		AceRegistry:NotifyChange("GDKPManager")
+	end
 end
 
 SLASH_GDKP1 = nil
@@ -370,7 +592,7 @@ SlashCmdList["GDKPMANAGER"] = function(msg)
 			AceDialog = LibStub("AceConfigDialog-3.0")
 			AceRegistry = LibStub("AceConfigRegistry-3.0")
 			LibStub("AceConfig-3.0"):RegisterOptionsTable("GDKPManager", options)
-			AceDialog:SetDefaultSize("GDKPManager", 625, 550)
+			AceDialog:SetDefaultSize("GDKPManager", 650, 550)
 			
 			Config:RegisterMessage("REBUILD_LOGS")
 		end
